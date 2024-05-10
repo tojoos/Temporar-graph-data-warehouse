@@ -25,14 +25,16 @@ public class UserService {
             .collect(Collectors.toSet());
     }
 
-    public Set<ParentUserDto> findAll(LocalDateTime startDate, LocalDateTime endDate) {
+    public Set<ParentUserDto> findAll(LocalDateTime timestamp) {
         return userRepository.findAll().stream()
-            .filter(u -> startDate.isAfter(u.getCreationTimestamp()))
+            .filter(u -> u.getCreationTimestamp().isBefore(timestamp))
             .map(ParentUserDto::new)
             .map(u -> {
-                Set<UserDto> filteredUserDtos = u.following().stream() //todo remove enddate - just date in time that will be checking current state as for this date
-                    .filter(uFollowing -> startDate.isAfter(uFollowing.followStartDate())
-                        && endDate.isBefore(uFollowing.followEndDate()))
+                Set<UserDto> filteredUserDtos = u.following().stream()
+                    // user had been created after requested timestamp (shouldn't be relevant in real life scenario)
+                    .filter(uFollowing -> uFollowing.creationTimestamp().isBefore(timestamp) &&
+                        // user started following before requested time and is following till now (hadn't stopped following before timestamp)
+                        uFollowing.followStartDate().isBefore(timestamp) && uFollowing.followEndDate().isAfter(timestamp))
                     .collect(Collectors.toSet());
                 return new ParentUserDto(u.id(), u.nickname(), u.sex(), u.nationality(), u.creationTimestamp(), filteredUserDtos);
             })
@@ -60,5 +62,15 @@ public class UserService {
         foundUser.setSex(user.sex());
 
         return new ParentUserDto(userRepository.save(foundUser));
+    }
+
+    public void followUser(User follower, User user) {
+        follower.follow(user);
+        userRepository.save(follower);
+    }
+
+    public void unfollowUser(User follower, User user) {
+        follower.unfollow(user);
+        userRepository.save(follower);
     }
 }

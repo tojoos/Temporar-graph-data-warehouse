@@ -1,5 +1,6 @@
 package tojoos.temporarygraphetl;
 
+import org.springframework.data.util.Pair;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -8,6 +9,7 @@ import tojoos.temporarygraphetl.Dto.UserDto;
 import tojoos.temporarygraphetl.exceptions.UserNotFoundException;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Set;
 
 @RestController
@@ -21,12 +23,9 @@ public class UserController {
   }
 
   @GetMapping("/users")
-  public ResponseEntity<Set<ParentUserDto>> findAll(@RequestParam(required = false) LocalDateTime startDate,
-                                    @RequestParam(required = false) LocalDateTime endDate) {
-    System.out.println(startDate);
-    System.out.println(endDate);
-    if (startDate != null && endDate != null) {
-        return new ResponseEntity<>(userService.findAll(startDate, endDate), HttpStatus.OK); //todo remove enddate - just date in time that will be checking current state as for this date
+  public ResponseEntity<Set<ParentUserDto>> findAll(@RequestParam(required = false) LocalDateTime timestamp) {
+    if (timestamp != null) {
+        return new ResponseEntity<>(userService.findAll(timestamp), HttpStatus.OK); //todo remove enddate - just date in time that will be checking current state as for this date
     }
 
     return new ResponseEntity<>(userService.findAll(), HttpStatus.OK);
@@ -40,4 +39,23 @@ public class UserController {
 
     return new ResponseEntity<>(userService.update(userDto), HttpStatus.CREATED);
   }
+
+  @PutMapping("/follow")
+  public void follows(@RequestBody List<Pair<Long, Long>> pairs) {
+    // Your processing logic here
+    for (Pair<Long, Long> pair : pairs) {
+      Long first = pair.getFirst();
+      Long second = pair.getSecond();
+      // Process the pair
+      System.out.println(first + " ---- nd: ----" + second);
+    }
+  }
+
+//
+//  @GetMapping("/unfollow")
+//  public Set<ParentUserDto> follows() {
+//    // 1 2
+//    // 4 5
+//    // 1 2
+//  }
 }
