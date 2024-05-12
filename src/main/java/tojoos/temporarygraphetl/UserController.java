@@ -9,6 +9,7 @@ import tojoos.temporarygraphetl.Dto.UserDto;
 import tojoos.temporarygraphetl.exceptions.UserNotFoundException;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -34,12 +35,16 @@ public class UserController {
   }
 
   @PutMapping("/update")
-  public ResponseEntity<ParentUserDto> update(@RequestBody UserDto userDto) throws UserNotFoundException {
-    if (userDto == null || userDto.id() == null) {
-      return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+  public ResponseEntity<?> update(@RequestBody List<UserDto> userDtos) throws UserNotFoundException {
+    Set<ParentUserDto> updatedUsers = new HashSet<>();
+    for (UserDto userDto : userDtos) {
+      if (userDto == null || userDto.id() == null) {
+        return new ResponseEntity<>( "Some users could not be uploaded due to missing id field", HttpStatus.BAD_REQUEST);
+      }
+      updatedUsers.add(userService.update(userDto));
     }
 
-    return new ResponseEntity<>(userService.update(userDto), HttpStatus.CREATED);
+    return new ResponseEntity<>(updatedUsers, HttpStatus.CREATED);
   }
 
   @PutMapping("/follow")
