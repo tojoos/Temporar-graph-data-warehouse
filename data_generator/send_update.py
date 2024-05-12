@@ -5,7 +5,7 @@ import time
 
 from generator import Generator
 
-URL = "http://127.0.0.1:5000"
+URL = "http://127.0.0.1:8080"
 ENDPOINT = "/update"
 
 gen = Generator()
@@ -36,6 +36,6 @@ while(True):
 
     # ---------- UNCOMMENT ----------
     # Put data
-    # response = requests.put(f"{URL}{ENDPOINT}", data=msg)
+    response = requests.put(f"{URL}{ENDPOINT}", data=msg)
 
     time.sleep(3)
