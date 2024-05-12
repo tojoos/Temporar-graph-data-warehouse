@@ -37,6 +37,10 @@ public class FollowsRelationship {
         this.followEndDate = LocalDateTime.of(9999, 1, 1, 0, 0, 0);
     }
 
+    public boolean isUserFollowed(LocalDateTime timestamp) {
+        return timestamp.isAfter(followStartDate) && timestamp.isBefore(followEndDate);
+    }
+
     public Long getId() {
         return id;
     }

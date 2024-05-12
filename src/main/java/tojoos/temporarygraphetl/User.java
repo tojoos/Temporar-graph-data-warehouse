@@ -7,10 +7,7 @@ import org.springframework.data.neo4j.core.schema.Relationship;
 import tojoos.temporarygraphetl.Dto.UserDto;
 
 import java.time.LocalDateTime;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 @Node
 public class User {
@@ -24,7 +21,7 @@ public class User {
 
   @JsonIgnoreProperties("user")
   @Relationship(type = "FOLLOWS", direction = Relationship.Direction.OUTGOING)
-  public Set<FollowsRelationship> following = new HashSet<>();
+  private Set<FollowsRelationship> following = new HashSet<>();
 
   public User() {
 
@@ -54,22 +51,57 @@ public class User {
     if (following == null) {
       following = new HashSet<>();
     }
-    following.add(new FollowsRelationship(user));
+    // check if user is already not followed
+    FollowsRelationship followsRelationshipFound = this.findFollowedRelationshipByUserId(user.id);
+    if (followsRelationshipFound == null) {
+      //todo handle situation where follow had already been ended (by followEndDate) and somebody re-followed
+      following.add(new FollowsRelationship(user));
+    }
   }
 
-  public void followsSince(User user, LocalDateTime followingSince) {
+  public void follow(User user, LocalDateTime followingSince) {
     if (following == null) {
       following = new HashSet<>();
     }
-    following.add(new FollowsRelationship(user, followingSince));
+    // if user is already followed don't do anything
+    FollowsRelationship followsRelationshipFound = this.findFollowedRelationshipByUserId(user.id);
+    if (followsRelationshipFound == null) {
+      //todo handle situation where follow had already been ended (by followEndDate) and somebody re-followed
+      following.add(new FollowsRelationship(user, followingSince));
+    }
   }
 
   public void unfollow(User user) {
     if (following == null) {
       following = new HashSet<>();
     } else {
-      following.remove(new FollowsRelationship(user));
+      FollowsRelationship followsRelationshipFound = this.findFollowedRelationshipByUserId(user.id);
+      // check if user has already been followed
+      if (followsRelationshipFound != null) {
+        LocalDateTime now = LocalDateTime.now();
+        // check if user is followed when trying to unfollow
+        if (followsRelationshipFound.isUserFollowed(now)) {
+          //todo handle situation where follow had already been ended (by followEndDate)
+          followsRelationshipFound.setFollowEndDate(now);
+        }
+      }
     }
+  }
+
+  private User findFollowedUserById(Long id) {
+    FollowsRelationship foundRelationship = this.findFollowedRelationshipByUserId(id);
+    if (foundRelationship != null) {
+      return foundRelationship.getUser();
+    } else {
+      return null;
+    }
+  }
+
+  private FollowsRelationship findFollowedRelationshipByUserId(Long id) {
+    return following.stream()
+        .filter(relationship -> relationship.getUser().id.equals(id))
+        .findFirst()
+        .orElse(null);
   }
 
   public String toString() {
@@ -140,5 +172,29 @@ public class User {
 
   public void setCreationTimestamp(LocalDateTime creationTimestamp) {
     this.creationTimestamp = creationTimestamp;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) return true;
+    if (o == null || getClass() != o.getClass()) return false;
+
+    User user = (User) o;
+
+    if (!id.equals(user.id)) return false;
+    if (!Objects.equals(nickname, user.nickname)) return false;
+    if (!Objects.equals(sex, user.sex)) return false;
+    if (!Objects.equals(nationality, user.nationality)) return false;
+    return Objects.equals(creationTimestamp, user.creationTimestamp);
+  }
+
+  @Override
+  public int hashCode() {
+    int result = id.hashCode();
+    result = 31 * result + (nickname != null ? nickname.hashCode() : 0);
+    result = 31 * result + (sex != null ? sex.hashCode() : 0);
+    result = 31 * result + (nationality != null ? nationality.hashCode() : 0);
+    result = 31 * result + (creationTimestamp != null ? creationTimestamp.hashCode() : 0);
+    return result;
   }
 }

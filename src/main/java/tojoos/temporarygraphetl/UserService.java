@@ -20,9 +20,7 @@ public class UserService {
     }
 
     public Set<ParentUserDto> findAll() {
-        return userRepository.findAll().stream()
-            .map(ParentUserDto::new)
-            .collect(Collectors.toSet());
+        return this.findAll(LocalDateTime.now());
     }
 
     public Set<ParentUserDto> findAll(LocalDateTime timestamp) {
@@ -41,7 +39,7 @@ public class UserService {
             .collect(Collectors.toSet());
     }
 
-    public User findById(Long id) throws UserNotFoundException {
+    public User findById(Long id) {
 //        return userRepository.findById(id).orElseThrow(() -> new UserNotFoundException("User with id={" + id + "} not found."));
         return userRepository.findById(id).orElse(null);
     }
@@ -62,6 +60,14 @@ public class UserService {
         foundUser.setSex(user.sex());
 
         return new ParentUserDto(userRepository.save(foundUser));
+    }
+
+    public void followUserById(Long followerId, Long userId) {
+        this.followUser(this.findById(followerId), this.findById(userId));
+    }
+
+    public void unfollowUserById(Long followerId, Long userId) {
+        this.unfollowUser(this.findById(followerId), this.findById(userId));
     }
 
     public void followUser(User follower, User user) {

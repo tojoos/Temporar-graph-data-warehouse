@@ -11,6 +11,8 @@ import tojoos.temporarygraphetl.exceptions.UserNotFoundException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 @RestController
 public class UserController {
@@ -25,7 +27,7 @@ public class UserController {
   @GetMapping("/users")
   public ResponseEntity<Set<ParentUserDto>> findAll(@RequestParam(required = false) LocalDateTime timestamp) {
     if (timestamp != null) {
-        return new ResponseEntity<>(userService.findAll(timestamp), HttpStatus.OK); //todo remove enddate - just date in time that will be checking current state as for this date
+        return new ResponseEntity<>(userService.findAll(timestamp), HttpStatus.OK);
     }
 
     return new ResponseEntity<>(userService.findAll(), HttpStatus.OK);
@@ -41,21 +43,40 @@ public class UserController {
   }
 
   @PutMapping("/follow")
-  public void follows(@RequestBody List<Pair<Long, Long>> pairs) {
-    // Your processing logic here
-    for (Pair<Long, Long> pair : pairs) {
-      Long first = pair.getFirst();
-      Long second = pair.getSecond();
-      // Process the pair
-      System.out.println(first + " ---- nd: ----" + second);
-    }
+  public ResponseEntity<?> follow(@RequestBody List<Pair<Long, Long>> usersPairs) throws ExecutionException, InterruptedException {
+    CompletableFuture<Long> successfulOperations = CompletableFuture.supplyAsync(() -> {
+      long counter = 0L;
+      for (Pair<Long, Long> usersPair : usersPairs) {
+        Long first = usersPair.getFirst();
+        Long second = usersPair.getSecond();
+        // Perform follow process of users
+        userService.followUserById(first, second);
+        counter++;
+      }
+      return counter;
+    });
+
+    boolean allOperationsSuccessful = usersPairs.size() == successfulOperations.get();
+    return allOperationsSuccessful ? new ResponseEntity<>("All operations successful.", HttpStatus.OK) :
+        new ResponseEntity<>( "Some operations were not successful", HttpStatus.BAD_REQUEST);
   }
 
-//
-//  @GetMapping("/unfollow")
-//  public Set<ParentUserDto> follows() {
-//    // 1 2
-//    // 4 5
-//    // 1 2
-//  }
+  @PutMapping("/unfollow")
+  public ResponseEntity<?> unfollow(@RequestBody List<Pair<Long, Long>> usersPairs) throws ExecutionException, InterruptedException {
+    CompletableFuture<Long> successfulOperations = CompletableFuture.supplyAsync(() -> {
+      long counter = 0L;
+      for (Pair<Long, Long> usersPair : usersPairs) {
+        Long first = usersPair.getFirst();
+        Long second = usersPair.getSecond();
+        // Perform follow process of users
+        userService.unfollowUserById(first, second);
+        counter++;
+      }
+      return counter;
+    });
+
+    boolean allOperationsSuccessful = usersPairs.size() == successfulOperations.get();
+    return allOperationsSuccessful ? new ResponseEntity<>("All operations successful.", HttpStatus.OK) :
+        new ResponseEntity<>( "Some operations were not successful", HttpStatus.BAD_REQUEST);
+  }
 }
