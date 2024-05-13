@@ -40,8 +40,6 @@ public class UserController {
       return new ResponseEntity<>(usersFound, HttpStatus.OK);
     }
 
-    log.info("Timestamp not specified, getting latest data.");
-
     usersFound = userService.findAll();
     log.info("Successfully finished processing of request GET '/users'");
     return new ResponseEntity<>(usersFound, HttpStatus.OK);
@@ -72,8 +70,12 @@ public class UserController {
         Long first = usersPair.getFirst();
         Long second = usersPair.getSecond();
         // Perform follow process for each id pair
-        userService.followUserById(first, second);
-        counter++;
+        try {
+          userService.followUserById(first, second);
+          counter++;
+        } catch (UserNotFoundException e) {
+          log.error("Pair '{}' contains invalid user ids, follow relationship will not be created for these.", usersPair);
+        }
       }
       return counter;
     });
@@ -93,8 +95,12 @@ public class UserController {
         Long first = usersPair.getFirst();
         Long second = usersPair.getSecond();
         // Perform unfollow process for each id pair
-        userService.unfollowUserById(first, second);
-        counter++;
+        try {
+          userService.unfollowUserById(first, second);
+          counter++;
+        } catch (UserNotFoundException e) {
+          log.error("Pair '{}' contains invalid user ids, follow relationship will not be updated for these.", usersPair);
+        }
       }
       return counter;
     });
