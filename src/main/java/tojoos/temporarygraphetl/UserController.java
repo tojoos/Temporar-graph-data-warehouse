@@ -11,7 +11,6 @@ import tojoos.temporarygraphetl.Dto.UserDto;
 import tojoos.temporarygraphetl.exceptions.UserNotFoundException;
 
 import java.time.LocalDateTime;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -31,31 +30,39 @@ public class UserController {
   }
 
   @GetMapping("/users")
-  public ResponseEntity<Set<ParentUserDto>> findAll(@RequestParam(required = false) LocalDateTime timestamp) {
+  public ResponseEntity<Set<ParentUserDto>> findAll(@RequestParam(required = false) LocalDateTime timestamp,
+                                                    @RequestParam(required = false, defaultValue = "true") Boolean optimized) {
     log.info("Received incoming request... GET '/users'");
-    Set<ParentUserDto> usersFound;
-    if (timestamp != null) {
-      usersFound = userService.findAll(timestamp);
-      log.info("Successfully finished processing of request GET '/users'");
-      return new ResponseEntity<>(usersFound, HttpStatus.OK);
-    }
+    Set<ParentUserDto> usersFound = optimized ? userService.findAllOptimized(timestamp) : userService.findAllDefault(timestamp);
 
-    usersFound = userService.findAll();
     log.info("Successfully finished processing of request GET '/users'");
     return new ResponseEntity<>(usersFound, HttpStatus.OK);
   }
 
+  @GetMapping("/no-relations/users")
+  public ResponseEntity<Set<ParentUserDto>> findAllNoRelations(@RequestParam(required = false) LocalDateTime timestamp) {
+    log.info("Received incoming request... GET '/no-relations/users'");
+    Set<ParentUserDto> usersFound = userService.findAllNoRelationsForCurrentTimestamp(timestamp);
+
+    log.info("Successfully finished processing of request GET '/no-relations/users'");
+    return new ResponseEntity<>(usersFound, HttpStatus.OK);
+  }
+
+  @GetMapping("/user/{id}")
+  public ResponseEntity<ParentUserDto> findById(@RequestParam(required = false) LocalDateTime timestamp,
+                                                @PathVariable Long id) {
+    log.info("Received incoming request... GET '/use/{}'", id);
+    ParentUserDto userFound = this.userService.findByIdForCurrentTimestamp(id, timestamp);
+
+    log.info("Successfully finished processing of request GET '/user/{}'", id);
+    return new ResponseEntity<>(userFound, HttpStatus.OK);
+  }
+
   @PutMapping("/update")
-  public ResponseEntity<?> update(@RequestBody List<UserDto> userDtos) throws UserNotFoundException {
+  public ResponseEntity<Set<ParentUserDto>> update(@RequestBody List<UserDto> userDtos) {
     log.info("Received incoming request... PUT '/update': " + userDtos);
-    Set<ParentUserDto> updatedUsers = new HashSet<>();
-    for (UserDto userDto : userDtos) {
-      if (userDto == null || userDto.id() == null) {
-        log.error("User or userId is not set, aborting further processing");
-        return new ResponseEntity<>( "Some users could not be uploaded due to missing id field", HttpStatus.BAD_REQUEST);
-      }
-      updatedUsers.add(userService.update(userDto));
-    }
+
+    Set<ParentUserDto> updatedUsers = this.userService.updateAll(userDtos);
 
     log.info("Successfully finished processing of PUT '/update': " + userDtos);
     return new ResponseEntity<>(updatedUsers, HttpStatus.OK);

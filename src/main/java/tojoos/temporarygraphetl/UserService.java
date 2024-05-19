@@ -9,6 +9,8 @@ import tojoos.temporarygraphetl.Dto.UserDto;
 import tojoos.temporarygraphetl.exceptions.UserNotFoundException;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -25,15 +27,15 @@ public class UserService {
         this.userRepository = userRepository;
     }
 
-    public Set<ParentUserDto> findAll() {
-        log.info("Timestamp not specified, getting latest data");
-        return this.findAll(LocalDateTime.now());
-    }
 
-    public Set<ParentUserDto> findAll(LocalDateTime timestamp) {
+    // This is not optimized, default Spring Data neo4j performs select on ever single object resulting in very long query time.
+    public Set<ParentUserDto> findAllDefault(LocalDateTime timestamp) {
+        LocalDateTime finalTimestamp = ensureTimestampIsNotNull(timestamp);
+
+        log.info("Using default findAll query");
         log.debug("Filtering all users that had been created after '{}' with valid follows for given timestamp", timestamp);
-        return userRepository.findAll().stream()
-            .filter(u -> u.getCreationTimestamp().isBefore(timestamp))
+        Set<ParentUserDto> foundParentUsers =  userRepository.findAll().stream()
+            .filter(u -> u.getCreationTimestamp().isBefore(finalTimestamp))
             .map(ParentUserDto::new)
             .map(u -> {
                 Set<UserDto> filteredUserDtos = u.following().stream()
@@ -45,6 +47,44 @@ public class UserService {
                 return new ParentUserDto(u.id(), u.nickname(), u.sex(), u.nationality(), u.creationTimestamp(), filteredUserDtos);
             })
             .collect(Collectors.toSet());
+
+        log.info("Found {} unique users using default findAll query", foundParentUsers.size());
+        return foundParentUsers;
+    }
+
+    public Set<ParentUserDto> findAllOptimized(LocalDateTime timestamp) {
+        timestamp = ensureTimestampIsNotNull(timestamp);
+
+        Set<ParentUserDto> foundParentUsers = this.userRepository.findAllForCurrentTimestamp(timestamp).stream()
+            .map(ParentUserDto::new)
+            .collect(Collectors.toSet());
+
+        log.info("Found {} unique users using optimized findAll query", foundParentUsers.size());
+        return foundParentUsers;
+    }
+
+    public Set<ParentUserDto> findAllNoRelationsForCurrentTimestamp(LocalDateTime timestamp) {
+        timestamp = ensureTimestampIsNotNull(timestamp);
+
+        Set<ParentUserDto> foundParentUsers = this.userRepository.findAllNoRelationsForCurrentTimestamp(timestamp).stream()
+            .map(ParentUserDto::new)
+            .collect(Collectors.toSet());
+
+        log.info("Found {} unique users using optimized findAllNoRelations query", foundParentUsers.size());
+        return foundParentUsers;
+    }
+
+    public ParentUserDto findByIdForCurrentTimestamp(Long id, LocalDateTime timestamp) {
+        timestamp = ensureTimestampIsNotNull(timestamp);
+        log.debug("Getting user with id={} for given timestamp: {}", id, timestamp);
+
+        Optional<User> foundUser = userRepository.findByIdForCurrentTimestamp(id, timestamp);
+        if (foundUser.isPresent()) {
+            return new ParentUserDto(foundUser.get());
+        } else {
+            log.debug("User with id={} not found, returning null", id);
+            return null;
+        }
     }
 
     public User findById(Long id) {
@@ -74,6 +114,35 @@ public class UserService {
         foundUser.setSex(user.sex());
 
         return new ParentUserDto(userRepository.save(foundUser));
+    }
+
+    public Set<ParentUserDto> updateAll(List<UserDto> users) {
+        log.debug("Updating [{}] users...", users.size());
+
+        Set<User> updatedUsers = users.stream()
+            .peek(user -> {
+                if (user == null) {
+                    log.warn("Null user found in the requested update list. Removing it from further processing.");
+                }
+            })
+            .filter(Objects::nonNull)
+            .map(user -> {
+                User foundUser = this.findById(user.id());
+                if (foundUser == null) {
+                    // create a new user if not found
+                    return new User(user);
+                }
+                foundUser.setNickname(user.nickname());
+                foundUser.setNationality(user.nationality());
+                foundUser.setSex(user.sex());
+                return foundUser;
+            })
+            .collect(Collectors.toSet());
+
+        // there is no support for batch neo4j insertion, so it will take quite a lot of time when inserting large number of objects
+        return userRepository.saveAll(updatedUsers).stream()
+            .map(ParentUserDto::new)
+            .collect(Collectors.toSet());
     }
 
     public void followUserById(Long followerId, Long userId) throws UserNotFoundException {
@@ -106,5 +175,15 @@ public class UserService {
             log.debug("Provided users are invalid. Follow relationship will not be deleted.");
             throw new UserNotFoundException("Provided users are invalid. Follow relationship will not be deleted.");
         }
+    }
+
+
+    private LocalDateTime ensureTimestampIsNotNull(LocalDateTime timestamp) {
+        if (timestamp == null) {
+            LocalDateTime now = LocalDateTime.now();
+            log.info("Timestamp not specified, using current moment one: {}", now);
+            return now;
+        }
+        return timestamp;
     }
 }
